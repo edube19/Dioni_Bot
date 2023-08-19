@@ -1,6 +1,41 @@
+import os
+#m_wm_w5_m_dl_ctrl2_lnkRun
+#m_wm_w5_m_dl_ctrl1_lnkRun
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+SPREADSHEET_ID ="10E8p8wXZl85mzL5q2yb62m4TAjJq1iXSTa3l9PC1zqw"
+
+def main_api():
+    credenciales =None
+    if os.path.exists("token.json"):
+        credenciales = Credentials.from_authorized_user_file("token.json",SCOPES)
+    if not credenciales or not credenciales.valid:
+        if credenciales and credenciales.expired and credenciales.refresh_token:
+            credenciales.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("credenciales.json",SCOPES)
+            credenciales = flow.run_local_server(port=0)
+        with open("token.json","w") as token:
+            token.write(credenciales.to_json())
+    try:
+        service = build("sheets","v4", credentials=credenciales)
+        sheets = service.spreadsheets()
+    except HttpError as e:
+        print("error: ",e)
+
 from playwright.sync_api import Playwright, sync_playwright,expect
 
 import time
+
+
+
+
 
 def run(playwright: Playwright) -> None:
     
@@ -52,20 +87,36 @@ def run(playwright: Playwright) -> None:
         #pagina de los contactos
         page1 = popup_info.value
         print('** entro para seleccionar los links **')
-
+        
         time.sleep(2)
         #añadir locator al botones de regresar en las apgiasn de enviar correo (cancel) y (return to my listenings)
 
         #m_ucDisplay_m_tdPagingSummary > b:nth-child(4)
+        
+        #m_ucDisplay_m_tdPagingSummary > b:nth-child(3) este es mas seguro
+        page1.locator('#m_ucDisplay_m_tdPagingSummary > b:nth-child(3)')
 
-        page1.locator('#m_ucDisplay_m_tdPagingSummary > b:nth-child(4)')
-
-        cantidad = page1.locator('#m_ucDisplay_m_tdPagingSummary > b:nth-child(4)').inner_text()
-        print('cantidad ',cantidad)
+        cantidad = page1.locator('#m_ucDisplay_m_tdPagingSummary > b:nth-child(3)').inner_text()
         int_cantidad = int(cantidad)
         reverse_prospect_lista = [0,1,2,3,4,5]
 
+        #anotando los ML #
+        # tr.DisplayAltRow:nth-child(x) > td:nth-child(10) > span:nth-child(1) > a:nth-child(1) , x es el que varia (1 - xx)
+        matriz_indices = []
+        
+        for indice in range(1,int_cantidad+1):
+            if indice % 2 != 0 or indice==1:    
+                #para los impares
+                elemento_locator = 'tr.DisplayRegRow:nth-child'
+            else:
+                # tr.DisplayAltRow:nth-child
+                #para los pares
+                elemento_locator = 'tr.DisplayAltRow:nth-child'
+            ml=page1.locator(f'{elemento_locator}({indice}) > td:nth-child(10) > span:nth-child(1) > a:nth-child(1)').inner_text()
+            matriz_indices.append(ml)
+
         for numero in range(1,int_cantidad+1):
+            matriz_agentes = []
             print(numero)
             #page1.reload()
             #tr.DisplayAltRow:nth-child(x) > td:nth-child(1) > span:nth-child(1) > input:nth-child(2), x es el que varia (1 - xx)
@@ -100,6 +151,15 @@ def run(playwright: Playwright) -> None:
             #m_extraColumns_ctlxx_lbEmail, donde xx es del rango [00,99]
             for lista_prospect in reverse_prospect_lista:
                 print(lista_prospect)
+                #m_extraColumns_ctl00_lbEmail
+                agente = page1.locator(f'#m_extraColumns_ctl0{lista_prospect}_lbEmail').inner_text()
+                matriz_agentes.append(agente)
+
+                #telefono
+                #tr.DisplayRegRow:nth-child(x) > td:nth-child(8) > div:nth-child(1) > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1) > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(3) > span:nth-child(1)
+                #x va de [2;infinito]
+                #impares > DisplayAltRow // pares > DisplayRegRow
+
                 #para ubicar los marcados con corazon
                 '''try:
                     print('entrando al try de buscar los corazones')
@@ -128,7 +188,7 @@ def run(playwright: Playwright) -> None:
                 page1.locator('#m_lbCancel > span:nth-child(1)').click()
                 #m_lbCancel > span:nth-child(1)
                 print('regreso a la lista de Prospect reverse')
-
+            print('lista de agentes guardados ',matriz_agentes)
             page1.locator('.linkIcon')
             print('ubico el boton para regresar a la lista de listenings')
             page1.locator('.linkIcon').click()
